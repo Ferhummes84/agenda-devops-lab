@@ -6,3 +6,4 @@ supabase>=2.5,<3
 anthropic>=0.34,<1
 requests>=2.31,<3
 streamlit-cookies-controller>=0.0.4,<0.1
+requests==2.6.0
