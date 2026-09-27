@@ -14,19 +14,19 @@ jobs:
         run: docker build -t agenda-devops-lab:${{ github.sha }} .
 
       - name: Trivy — scan de vulnerabilidades (SCA + imagem)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: agenda-devops-lab:${{ github.sha }}
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: 1
-
+        image-ref: agenda-devops-lab:${{ github.sha }}
+        format: table
+        severity: HIGH,CRITICAL
+        exit-code: 1
+        
       - name: Trivy — geração de SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: agenda-devops-lab:${{ github.sha }}
-          format: cyclonedx
-          output: sbom.cyclonedx.json
+        image-ref: agenda-devops-lab:${{ github.sha }}
+        format: cyclonedx
+        output: sbom.cyclonedx.json
 
       - name: Upload SBOM como artefato
         uses: actions/upload-artifact@v4
