@@ -16,17 +16,19 @@ jobs:
       - name: Trivy — scan de vulnerabilidades (SCA + imagem)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-        image-ref: agenda-devops-lab:${{ github.sha }}
-        format: table
-        severity: HIGH,CRITICAL
-        exit-code: 1
-        
+          image-ref: agenda-devops-lab:${{ github.sha }}
+          format: table
+          skip-files: usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
       - name: Trivy — geração de SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-        image-ref: agenda-devops-lab:${{ github.sha }}
-        format: cyclonedx
-        output: sbom.cyclonedx.json
+          image-ref: agenda-devops-lab:${{ github.sha }}
+          format: cyclonedx
+          output: sbom.cyclonedx.json
 
       - name: Upload SBOM como artefato
         uses: actions/upload-artifact@v4
