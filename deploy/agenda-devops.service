@@ -1,0 +1,16 @@
+[Unit]
+Description=Agenda DevOps (Streamlit)
+After=network.target
+
+[Service]
+# Ajuste User/Group e os caminhos abaixo conforme seu usuário na VPS
+User=SEU_USUARIO
+Group=SEU_USUARIO
+WorkingDirectory=/home/SEU_USUARIO/agenda-devops
+EnvironmentFile=/home/SEU_USUARIO/agenda-devops/.env
+ExecStart=/home/SEU_USUARIO/agenda-devops/venv/bin/streamlit run app.py --server.port 8501 --server.address 127.0.0.1 --server.headless true
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
