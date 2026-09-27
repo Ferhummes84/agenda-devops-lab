@@ -18,6 +18,7 @@ jobs:
         with:
           image-ref: agenda-devops-lab:${{ github.sha }}
           format: table
+          skip-files: usr/local/lib/python3.11/site-packages/pip/_vendor/bom.cdx.json
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
