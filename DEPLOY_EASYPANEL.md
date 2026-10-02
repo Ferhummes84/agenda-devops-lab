@@ -30,7 +30,7 @@ No painel do EasyPanel (porta 3000 da sua VPS):
 
    | Nome | Valor |
    |---|---|
-   | `SUPABASE_URL` | `https://xzblsddegiwckaxkyowg.supabase.co` |
+   | `SUPABASE_URL` | `https://<SUPABASE_PROJECT_REF>.supabase.co` |
    | `SUPABASE_KEY` | (a mesma anon key do `.env` local) |
    | `ANTHROPIC_API_KEY` | sua chave da Anthropic |
    | `PUBLIC_APP_URL` | por enquanto, deixe em branco ou use a URL temporária que o EasyPanel gerar (você edita isso na Parte 4, quando decidir o domínio) |
@@ -90,7 +90,7 @@ Se retornar `ok`, a rede está funcionando e o openclaw pode alcançar o app
 diretamente. **Importante:** isso serve pra acessar a *interface* do
 Streamlit internamente, se você quiser isso no futuro. Para o openclaw
 **adicionar tarefas**, ele não precisa disso — continua usando o mesmo
-webhook `add-tasks` do Supabase (`https://xzblsddegiwckaxkyowg.supabase.co/
+webhook `add-tasks` do Supabase (`https://<SUPABASE_PROJECT_REF>.supabase.co/
 functions/v1/add-tasks` + header `x-webhook-secret`), que já funciona de
 qualquer lugar com internet, testado e ativo. Rede Docker compartilhada não
 muda nada nesse fluxo — é só um bônus de organização.

@@ -8,7 +8,7 @@ Supabase e decomposição de metas pela API da Anthropic.
 branch `main` deste repositório. Veja [Deploy](#deploy).
 
 Projeto Supabase:
-- Nome: **Agenda DevOps** · Region `sa-east-1` · Project ref `xzblsddegiwckaxkyowg`
+- Nome: **Agenda DevOps** · Region `sa-east-1` · Project ref `<SUPABASE_PROJECT_REF>`
 - Tabelas: `daily_plans`, `tasks`, `goals`, `long_term_goals`
 - Storage: bucket público `audios` (resumos em áudio do Jarvis)
 

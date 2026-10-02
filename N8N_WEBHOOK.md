@@ -6,7 +6,7 @@ dashboard, as tarefas já geradas pela automação estarão lá.
 
 **URL do endpoint:**
 ```
-https://xzblsddegiwckaxkyowg.supabase.co/functions/v1/add-tasks
+https://<SUPABASE_PROJECT_REF>.supabase.co/functions/v1/add-tasks
 ```
 
 ## 1. Configurar o secret (uma vez só)
@@ -26,7 +26,7 @@ n8n, ou um gerenciador de senhas) — **não cole em nenhum arquivo do
 repositório**. Configure-o no projeto Supabase por uma destas duas formas:
 
 **Opção A — pelo Dashboard (mais simples):**
-1. Acesse https://supabase.com/dashboard/project/xzblsddegiwckaxkyowg/functions
+1. Acesse https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF>/functions
 2. Clique em "add-tasks" → aba "Secrets" (ou "Manage secrets", dependendo da versão da UI)
 3. Adicione: chave `WEBHOOK_SECRET`, valor o hex que você gerou
 4. Salve
@@ -34,8 +34,8 @@ repositório**. Configure-o no projeto Supabase por uma destas duas formas:
 **Opção B — via Supabase CLI:**
 ```bash
 supabase login
-supabase link --project-ref xzblsddegiwckaxkyowg
-supabase secrets set WEBHOOK_SECRET=<cole aqui o hex que você gerou> --project-ref xzblsddegiwckaxkyowg
+supabase link --project-ref <SUPABASE_PROJECT_REF>
+supabase secrets set WEBHOOK_SECRET=<cole aqui o hex que você gerou> --project-ref <SUPABASE_PROJECT_REF>
 ```
 
 ## 2. Testar com curl
@@ -43,7 +43,7 @@ supabase secrets set WEBHOOK_SECRET=<cole aqui o hex que você gerou> --project-
 Depois de configurar o secret, teste do seu terminal:
 
 ```bash
-curl -X POST https://xzblsddegiwckaxkyowg.supabase.co/functions/v1/add-tasks \
+curl -X POST https://<SUPABASE_PROJECT_REF>.supabase.co/functions/v1/add-tasks \
   -H "Content-Type: application/json" \
   -H "x-webhook-secret: <cole aqui o hex que você gerou>" \
   -d '{
@@ -111,7 +111,7 @@ se for a primeira do dia).
 
 No node **HTTP Request**:
 - Method: `POST`
-- URL: `https://xzblsddegiwckaxkyowg.supabase.co/functions/v1/add-tasks`
+- URL: `https://<SUPABASE_PROJECT_REF>.supabase.co/functions/v1/add-tasks`
 - Headers: `x-webhook-secret` = (o secret configurado no passo 1) — salve
   como uma credencial/variável no n8n, não deixe hardcoded no node.
 - Body: JSON, no formato acima, montado a partir da saída do seu fluxo

@@ -361,10 +361,18 @@ with st.sidebar:
     # arquivo no servidor e entrega os bytes ao st.audio, que os serve pelo
     # próprio domínio: o CSP de produção (default-src 'self', sem media-src)
     # bloqueia o navegador de carregar mídia direto do Supabase.
+    # As URLs vêm do ambiente, sem valor padrão: o lab nunca pode chamar a
+    # produção (um scanner DAST clicaria nesses botões).
     JARVIS_AUDIO_URLS = {
-        "Resumo da manhã": "https://xzblsddegiwckaxkyowg.supabase.co/storage/v1/object/public/audios/resumo-dia.mp3",
-        "Resumo do fim de tarde": "https://xzblsddegiwckaxkyowg.supabase.co/storage/v1/object/public/audios/resumo-fim-tarde.mp3",
+        label: url
+        for label, url in {
+            "Resumo da manhã": get_config("JARVIS_AUDIO_MORNING_URL"),
+            "Resumo do fim de tarde": get_config("JARVIS_AUDIO_EVENING_URL"),
+        }.items()
+        if url
     }
+    if not JARVIS_AUDIO_URLS:
+        st.caption("Jarvis desativado neste ambiente.")
     for label, url in JARVIS_AUDIO_URLS.items():
         if st.button(f"🔊 {label}", key=f"jarvis_play_{label}"):
             try:
@@ -376,13 +384,13 @@ with st.sidebar:
                 st.error(f"Não foi possível carregar o áudio: {e}")
 
     st.markdown("---")
-    if st.button("🔄 Atualizar calendário agora"):
+    CALENDAR_SYNC_WEBHOOK_URL = get_config("CALENDAR_SYNC_WEBHOOK_URL")
+    if not CALENDAR_SYNC_WEBHOOK_URL:
+        st.caption("Sincronização desativada neste ambiente.")
+    elif st.button("🔄 Atualizar calendário agora"):
         with st.spinner("Sincronizando..."):
             try:
-                resp = requests.get(
-                    "https://n8n.automabot.net.br/webhook/sync-calendario-agora",
-                    timeout=15,
-                )
+                resp = requests.get(CALENDAR_SYNC_WEBHOOK_URL, timeout=15)
                 resp.raise_for_status()
                 time.sleep(3)  # dá um tempo pro n8n terminar de gravar antes do rerun
                 st.rerun()
@@ -412,95 +420,13 @@ STAGE_COLORS = {
     "Education": "#8b949e",
 }
 
-col_left, col_main, col_right = st.columns([1.2, 3, 1.2])
+# =========================================================================
+# PÁGINAS (cada seção tem rota própria; tudo acima roda antes da navegação,
+# então sem sessão qualquer rota mostra apenas o login)
+# =========================================================================
 
-# ---------- COLUNA ESQUERDA: Metas de Longo Prazo + Reuniões da Semana ----------
-with col_left:
-    ui.heading("Metas de Longo Prazo", "flag")
-
-    if not long_term_goals:
-        st.caption("Nenhuma meta de longo prazo cadastrada ainda.")
-    for g in long_term_goals:
-        done_hours = logged_hours_by_goal.get(g["id"], 0.0)
-        total_hours = float(g["total_hours"])
-        pct = min(done_hours / total_hours, 1.0) if total_hours else 0.0
-        level_info = (
-            f" · Nível {g['current_level']}/{g['total_levels']}"
-            if g.get("total_levels")
-            else f" · Nível {g['current_level']}"
-        )
-        st.markdown(f"**{g['title']}**")
-        st.progress(pct)
-        st.caption(f"{done_hours:.1f}h / {total_hours:.0f}h ({pct * 100:.0f}%){level_info}")
-        with st.expander("Atualizar nível", expanded=False):
-            new_level = st.number_input(
-                "Nível atual",
-                min_value=1,
-                max_value=int(g["total_levels"]) if g.get("total_levels") else 999,
-                value=int(g["current_level"]),
-                step=1,
-                key=f"level_{g['id']}",
-            )
-            if st.button("Salvar nível", key=f"update_level_{g['id']}"):
-                db.update_long_term_goal_level(client, g["id"], int(new_level))
-                st.rerun()
-
-    with st.expander("+ Nova meta de longo prazo"):
-        with st.form("new_long_term_goal", clear_on_submit=True):
-            lt_title = st.text_input("Título da meta")
-            lt_hours = st.number_input("Carga horária total (h)", min_value=0.5, step=0.5, value=10.0)
-            lt_levels = st.number_input("Total de níveis/etapas (0 = sem níveis)", min_value=0, step=1, value=0)
-            lt_current_level = st.number_input("Nível atual", min_value=1, step=1, value=1)
-            lt_submitted = st.form_submit_button("Criar meta")
-            if lt_submitted and lt_title:
-                db.create_long_term_goal(
-                    client,
-                    title=lt_title,
-                    total_hours=lt_hours,
-                    total_levels=int(lt_levels) if lt_levels > 0 else None,
-                    current_level=int(lt_current_level),
-                )
-                st.rerun()
-
-    st.markdown("---")
-    ui.heading("Reuniões da Semana", "activity")
-
-    week_meetings = db.get_week_meetings(client, plan_date)
-    st.markdown(f"**{len(week_meetings)} reuniões aceitas** nesta semana")
-
-    if week_meetings:
-        categories = Counter(
-            categorize_meeting_title(m["title"]) for m in week_meetings
-        )
-        palette = list(STAGE_COLORS.values())
-        max_count = max(categories.values())
-
-        # Sem indentação no HTML: linhas com 4+ espaços viram bloco de
-        # código no markdown do Streamlit em vez de serem renderizadas.
-        rows_html = ""
-        for i, (label, count) in enumerate(
-            sorted(categories.items(), key=lambda x: -x[1])
-        ):
-            color = palette[i % len(palette)]
-            width_pct = (count / max_count) * 100
-            safe_label = html.escape(label)
-            rows_html += (
-                '<div style="margin-bottom: 10px;">'
-                '<div style="display: flex; justify-content: space-between; '
-                'font-size: 12px; color: #c9d1d9; margin-bottom: 3px;">'
-                f'<span>{safe_label}</span><span style="color: #8b949e;">{count}</span>'
-                '</div>'
-                '<div style="background: #21262d; border-radius: 999px; height: 6px; overflow: hidden;">'
-                f'<div style="background: {color}; width: {width_pct}%; height: 100%; border-radius: 999px;"></div>'
-                '</div>'
-                '</div>'
-            )
-        st.markdown(rows_html, unsafe_allow_html=True)
-    else:
-        st.caption("Nenhuma reunião aceita registrada nesta semana ainda.")
-
-# ---------- COLUNA CENTRAL: Pipeline Timeline ----------
-with col_main:
+# ---------- Pipeline Timeline ----------
+def page_pipeline():
     ui.heading("Pipeline do Dia", "git-branch")
 
     # Os balões disparam no run seguinte ao da marcação: chamados antes do
@@ -573,8 +499,8 @@ with col_main:
                 slot = [(start_dt, finish_dt)]
             else:
                 slot = db.find_free_slots(tasks, plan_date, [duration_h])
-            # Sem st.stop() aqui: ele interromperia o script e a coluna do
-            # Orquestrador IA não seria desenhada junto com o erro.
+            # Sem st.stop() aqui: ele interromperia o script e o resto da
+            # página não seria desenhado junto com o erro.
             if not slot:
                 st.error(
                     "Não sobrou horário livre entre 9h e 18h hoje. Marque "
@@ -600,8 +526,96 @@ with col_main:
                 st.rerun()
 
 
-# ---------- COLUNA DIREITA: Orquestrador IA ----------
-with col_right:
+# ---------- Metas de Longo Prazo ----------
+def page_metas():
+    ui.heading("Metas de Longo Prazo", "flag")
+
+    if not long_term_goals:
+        st.caption("Nenhuma meta de longo prazo cadastrada ainda.")
+    for g in long_term_goals:
+        done_hours = logged_hours_by_goal.get(g["id"], 0.0)
+        total_hours = float(g["total_hours"])
+        pct = min(done_hours / total_hours, 1.0) if total_hours else 0.0
+        level_info = (
+            f" · Nível {g['current_level']}/{g['total_levels']}"
+            if g.get("total_levels")
+            else f" · Nível {g['current_level']}"
+        )
+        st.markdown(f"**{g['title']}**")
+        st.progress(pct)
+        st.caption(f"{done_hours:.1f}h / {total_hours:.0f}h ({pct * 100:.0f}%){level_info}")
+        with st.expander("Atualizar nível", expanded=False):
+            new_level = st.number_input(
+                "Nível atual",
+                min_value=1,
+                max_value=int(g["total_levels"]) if g.get("total_levels") else 999,
+                value=int(g["current_level"]),
+                step=1,
+                key=f"level_{g['id']}",
+            )
+            if st.button("Salvar nível", key=f"update_level_{g['id']}"):
+                db.update_long_term_goal_level(client, g["id"], int(new_level))
+                st.rerun()
+
+    with st.expander("+ Nova meta de longo prazo"):
+        with st.form("new_long_term_goal", clear_on_submit=True):
+            lt_title = st.text_input("Título da meta")
+            lt_hours = st.number_input("Carga horária total (h)", min_value=0.5, step=0.5, value=10.0)
+            lt_levels = st.number_input("Total de níveis/etapas (0 = sem níveis)", min_value=0, step=1, value=0)
+            lt_current_level = st.number_input("Nível atual", min_value=1, step=1, value=1)
+            lt_submitted = st.form_submit_button("Criar meta")
+            if lt_submitted and lt_title:
+                db.create_long_term_goal(
+                    client,
+                    title=lt_title,
+                    total_hours=lt_hours,
+                    total_levels=int(lt_levels) if lt_levels > 0 else None,
+                    current_level=int(lt_current_level),
+                )
+                st.rerun()
+
+
+# ---------- Reuniões da Semana ----------
+def page_reunioes():
+    ui.heading("Reuniões da Semana", "activity")
+
+    week_meetings = db.get_week_meetings(client, plan_date)
+    st.markdown(f"**{len(week_meetings)} reuniões aceitas** nesta semana")
+
+    if week_meetings:
+        categories = Counter(
+            categorize_meeting_title(m["title"]) for m in week_meetings
+        )
+        palette = list(STAGE_COLORS.values())
+        max_count = max(categories.values())
+
+        # Sem indentação no HTML: linhas com 4+ espaços viram bloco de
+        # código no markdown do Streamlit em vez de serem renderizadas.
+        rows_html = ""
+        for i, (label, count) in enumerate(
+            sorted(categories.items(), key=lambda x: -x[1])
+        ):
+            color = palette[i % len(palette)]
+            width_pct = (count / max_count) * 100
+            safe_label = html.escape(label)
+            rows_html += (
+                '<div style="margin-bottom: 10px;">'
+                '<div style="display: flex; justify-content: space-between; '
+                'font-size: 12px; color: #c9d1d9; margin-bottom: 3px;">'
+                f'<span>{safe_label}</span><span style="color: #8b949e;">{count}</span>'
+                '</div>'
+                '<div style="background: #21262d; border-radius: 999px; height: 6px; overflow: hidden;">'
+                f'<div style="background: {color}; width: {width_pct}%; height: 100%; border-radius: 999px;"></div>'
+                '</div>'
+                '</div>'
+            )
+        st.markdown(rows_html, unsafe_allow_html=True)
+    else:
+        st.caption("Nenhuma reunião aceita registrada nesta semana ainda.")
+
+
+# ---------- Orquestrador IA ----------
+def page_orquestrador():
     ui.heading("Orquestrador IA", "sparkles")
     meta_input = st.text_area(
         "Defina sua Meta (Macro):",
@@ -673,59 +687,70 @@ with col_right:
                     st.error(f"Erro ao chamar a IA: {e}")
 
 
-# ---------- GitHub (largura cheia, abaixo das 3 colunas) ----------
-st.markdown("---")
-ui.heading("GitHub", "github")
+# ---------- GitHub ----------
+def page_github():
+    ui.heading("GitHub", "github")
 
-if not GITHUB_TOKEN:
-    st.info("GITHUB_TOKEN não configurado — a seção do GitHub fica desativada.")
-else:
-    try:
-        repos = fetch_github_repos()
-        repos = repos[:5]
-    except Exception as e:
-        repos = []
-        st.error(f"Não foi possível carregar os repositórios: {e}")
+    if not GITHUB_TOKEN:
+        st.info("GITHUB_TOKEN não configurado — a seção do GitHub fica desativada.")
+    else:
+        try:
+            repos = fetch_github_repos()
+            repos = repos[:5]
+        except Exception as e:
+            repos = []
+            st.error(f"Não foi possível carregar os repositórios: {e}")
 
-    for i, repo in enumerate(repos):
-        # pushed_at pode vir null na API; cai pro updated_at pra não quebrar a página.
-        pushed_raw = repo.get("pushed_at") or repo["updated_at"]
-        pushed = datetime.fromisoformat(pushed_raw.replace("Z", "+00:00"))
-        repo_color = list(STAGE_COLORS.values())[i % len(STAGE_COLORS)]
-        st.markdown(
-            f'<div style="height: 3px; background: {repo_color}; '
-            f'border-radius: 2px; margin-bottom: 2px;"></div>',
-            unsafe_allow_html=True,
-        )
-        with st.expander(
-            f"{repo['name']} · último push em {pushed.strftime('%d/%m/%Y')} · "
-            f"{repo['open_issues_count']} issues abertas"
-        ):
-            st.caption(repo.get("description") or "Sem descrição.")
-            if st.button("🔍 Ver detalhes (commits, PRs, CI)", key=f"gh_details_{repo['id']}"):
-                with st.spinner("Buscando..."):
-                    details = fetch_repo_details(repo["full_name"])
+        for i, repo in enumerate(repos):
+            # pushed_at pode vir null na API; cai pro updated_at pra não quebrar a página.
+            pushed_raw = repo.get("pushed_at") or repo["updated_at"]
+            pushed = datetime.fromisoformat(pushed_raw.replace("Z", "+00:00"))
+            repo_color = list(STAGE_COLORS.values())[i % len(STAGE_COLORS)]
+            st.markdown(
+                f'<div style="height: 3px; background: {repo_color}; '
+                f'border-radius: 2px; margin-bottom: 2px;"></div>',
+                unsafe_allow_html=True,
+            )
+            with st.expander(
+                f"{repo['name']} · último push em {pushed.strftime('%d/%m/%Y')} · "
+                f"{repo['open_issues_count']} issues abertas"
+            ):
+                st.caption(repo.get("description") or "Sem descrição.")
+                if st.button("🔍 Ver detalhes (commits, PRs, CI)", key=f"gh_details_{repo['id']}"):
+                    with st.spinner("Buscando..."):
+                        details = fetch_repo_details(repo["full_name"])
 
-                if details["last_commit"]:
-                    c = details["last_commit"]
-                    st.markdown(f"**Último commit:** {c['message']} — {c['author']}")
+                    if details["last_commit"]:
+                        c = details["last_commit"]
+                        st.markdown(f"**Último commit:** {c['message']} — {c['author']}")
 
-                prs = details["open_prs"]
-                if prs:
-                    st.markdown(f"**{len(prs)} PR(s) aberta(s):**")
-                    for pr in prs:
-                        st.markdown(f"- [{pr['title']}]({pr['html_url']})")
-                else:
-                    st.caption("Nenhuma PR aberta.")
+                    prs = details["open_prs"]
+                    if prs:
+                        st.markdown(f"**{len(prs)} PR(s) aberta(s):**")
+                        for pr in prs:
+                            st.markdown(f"- [{pr['title']}]({pr['html_url']})")
+                    else:
+                        st.caption("Nenhuma PR aberta.")
 
-                run = details["latest_run"]
-                if run:
-                    icon = "🟢" if run["conclusion"] == "success" else (
-                        "🔴" if run["conclusion"] == "failure" else "🟡"
-                    )
-                    st.markdown(
-                        f"**Última execução do CI:** {icon} {run['name']} "
-                        f"({run['branch']}) — {run['status']}"
-                    )
-                else:
-                    st.caption("Nenhuma execução de CI encontrada.")
+                    run = details["latest_run"]
+                    if run:
+                        icon = "🟢" if run["conclusion"] == "success" else (
+                            "🔴" if run["conclusion"] == "failure" else "🟡"
+                        )
+                        st.markdown(
+                            f"**Última execução do CI:** {icon} {run['name']} "
+                            f"({run['branch']}) — {run['status']}"
+                        )
+                    else:
+                        st.caption("Nenhuma execução de CI encontrada.")
+
+
+pages = [
+    st.Page(page_pipeline, title="Pipeline do Dia", icon=":material/timeline:", default=True),
+    st.Page(page_metas, title="Metas", icon=":material/flag:", url_path="metas"),
+    st.Page(page_reunioes, title="Reuniões", icon=":material/groups:", url_path="reunioes"),
+    st.Page(page_orquestrador, title="Orquestrador IA", icon=":material/auto_awesome:", url_path="orquestrador"),
+    st.Page(page_github, title="GitHub", icon=":material/code:", url_path="github"),
+]
+
+st.navigation(pages).run()
